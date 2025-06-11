@@ -25,8 +25,6 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
-
-
 // Configuración de multer para subir PDFs
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -111,6 +109,8 @@ app.get('/productos/variantes/:id', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener el stock de la variante' });
   }
 });
+
+
 
 app.patch('/productos/variantes/:id', async (req, res) => {
   try {
