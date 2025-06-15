@@ -131,6 +131,81 @@ app.patch('/productos/variantes/:id', async (req, res) => {
   }
 });
 
+app.post('/finalizar-compra', async (req, res) => {
+  const productosEnCarrito = req.body.productos; // [{ id: 101, cantidad: 2 }, ...]
+
+  if (!Array.isArray(productosEnCarrito) || productosEnCarrito.length === 0) {
+    return res.status(400).json({
+      ok: false,
+      mensaje: 'No se recibieron productos válidos para la compra.'
+    });
+  }
+
+  try {
+    // 1. Verificar stock para cada variante
+    for (const item of productosEnCarrito) {
+      // Buscar el producto que contenga la variante por id
+      const producto = await Producto.findOne({ "variantes.id": item.id });
+
+      if (!producto) {
+        return res.status(400).json({
+          ok: false,
+          mensaje: `Producto con variante ID ${item.id} no encontrado.`
+        });
+      }
+
+      // Encontrar la variante dentro del producto
+      const variante = producto.variantes.find(v => v.id === item.id);
+
+      if (!variante) {
+        return res.status(400).json({
+          ok: false,
+          mensaje: `Variante con ID ${item.id} no encontrada.`
+        });
+      }
+
+      if (variante.stock < item.cantidad) {
+        return res.status(400).json({
+          ok: false,
+          mensaje: `Stock insuficiente para variante ID ${item.id}. Disponible: ${variante.stock}, solicitado: ${item.cantidad}`
+        });
+      }
+    }
+
+    // 2. Descontar stock para cada variante (operación atómica por variante)
+    for (const item of productosEnCarrito) {
+      const actualizado = await Producto.findOneAndUpdate(
+        {
+          "variantes.id": item.id,
+          "variantes.stock": { $gte: item.cantidad }
+        },
+        { $inc: { "variantes.$.stock": -item.cantidad } },
+        { new: true }
+      );
+
+      if (!actualizado) {
+        return res.status(400).json({
+          ok: false,
+          mensaje: `Error al descontar stock para variante ID ${item.id}. Otro cliente puede haber comprado justo antes.`
+        });
+      }
+    }
+
+    // Si llegamos acá, todo fue bien
+    return res.status(200).json({
+      ok: true,
+      mensaje: 'Compra realizada con éxito.'
+    });
+
+  } catch (error) {
+    console.error('Error al finalizar compra:', error);
+    return res.status(500).json({
+      ok: false,
+      mensaje: 'Error interno al procesar la compra.'
+    });
+  }
+});
+
 
 
 // Iniciar servidor
