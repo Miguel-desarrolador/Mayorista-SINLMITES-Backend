@@ -132,14 +132,10 @@ app.patch('/productos/variantes/:id', async (req, res) => {
 app.delete('/productos/variantes/:id', async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Encontrar el producto que contiene la variante
     const producto = await Producto.findOne({ "variantes.id": Number(id) });
     if (!producto) {
       return res.status(404).json({ error: 'Variante no encontrada' });
     }
-
-    // Encontrar la variante para borrar su imagen si aplica
     const variante = producto.variantes.find(v => v.id === Number(id));
     if (variante && variante.imagen) {
       const rutaImagen = path.join(__dirname, 'uploads', path.basename(variante.imagen));
@@ -147,17 +143,16 @@ app.delete('/productos/variantes/:id', async (req, res) => {
         if (err) console.warn('No se pudo eliminar la imagen:', rutaImagen);
       });
     }
-
-    // Eliminar variante del arreglo
     producto.variantes = producto.variantes.filter(v => v.id !== Number(id));
     await producto.save();
 
     res.json({ message: 'Variante eliminada correctamente', producto });
   } catch (error) {
-    console.error('Error al eliminar variante:', error);
+    console.error('Error al eliminar variante:', error);  // <--- Agregar esta línea
     res.status(500).json({ error: 'Error al eliminar la variante' });
   }
 });
+
 
 
 
