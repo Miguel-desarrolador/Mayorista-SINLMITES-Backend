@@ -98,24 +98,17 @@ app.get('/productos/variantes', async (req, res) => {
   }
 });
 
+
+
 app.get('/productos/variantes/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const producto = await Producto.findOne({ "variantes.id": Number(id) });
-    if (!producto) return res.status(404).json({ error: 'Producto no encontrado' });
-
-    const variante = producto.variantes.find(v => v.id === Number(id));
+    const productos = await Producto.find();
+    const variante = productos.flatMap(producto => producto.variantes).find(v => v.id === Number(id));
     if (!variante) return res.status(404).json({ error: 'Variante no encontrada' });
-
-    res.json({
-      producto: {
-        nombre: producto.nombre,
-        imagen: producto.imagen,
-      },
-      variante,
-    });
+    res.json({ stock: variante.stock });
   } catch (err) {
-    res.status(500).json({ error: 'Error al obtener la variante' });
+    res.status(500).json({ error: 'Error al obtener el stock de la variante' });
   }
 });
 
