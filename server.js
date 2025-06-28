@@ -129,57 +129,34 @@ app.patch('/productos/variantes/:id', async (req, res) => {
 });
 
 app.delete('/productos/variantes/:id', async (req, res) => {
-  const { id } = req.params;
-  const idNumero = Number(id);
-
-  if (isNaN(idNumero)) {
-    return res.status(400).json({ error: 'ID inválido' });
-  }
-
   try {
-    const producto = await Producto.findOne({ "variantes.id": idNumero });
+    const { id } = req.params;
 
+    // Encontrar el producto que contiene la variante
+    const producto = await Producto.findOne({ "variantes.id": Number(id) });
     if (!producto) {
-      return res.status(404).json({ error: `No se encontró un producto con la variante ID ${idNumero}` });
+      return res.status(404).json({ error: 'Variante no encontrada' });
     }
 
-    const variante = producto.variantes.find(v => v.id === idNumero);
-
-    if (!variante) {
-      return res.status(404).json({ error: `Variante con ID ${idNumero} no encontrada dentro del producto` });
-    }
-
-    // Eliminar imagen asociada a la variante (si existe)
-    if (variante.imagen) {
-      const nombreArchivo = path.basename(variante.imagen);
-      const rutaImagen = path.join(__dirname, 'uploads', nombreArchivo);
-
-      if (fs.existsSync(rutaImagen)) {
-        fs.unlinkSync(rutaImagen);
-        console.log(`Imagen eliminada: ${nombreArchivo}`);
-      } else {
-        console.warn('Imagen no encontrada en la carpeta uploads:', nombreArchivo);
-      }
+    // Encontrar la variante para borrar su imagen si aplica
+    const variante = producto.variantes.find(v => v.id === Number(id));
+    if (variante && variante.imagen) {
+      const rutaImagen = path.join(__dirname, 'uploads', path.basename(variante.imagen));
+      fs.unlink(rutaImagen, (err) => {
+        if (err) console.warn('No se pudo eliminar la imagen:', rutaImagen);
+      });
     }
 
     // Eliminar variante del arreglo
-    producto.variantes = producto.variantes.filter(v => v.id !== idNumero);
+    producto.variantes = producto.variantes.filter(v => v.id !== Number(id));
     await producto.save();
 
-    res.json({
-      ok: true,
-      mensaje: `Variante con ID ${idNumero} eliminada correctamente`,
-      producto
-    });
+    res.json({ message: 'Variante eliminada correctamente', producto });
   } catch (error) {
-    console.error('❌ Error al eliminar variante:', error);
-    res.status(500).json({ error: 'Error interno al eliminar la variante' });
+    console.error('Error al eliminar variante:', error);
+    res.status(500).json({ error: 'Error al eliminar la variante' });
   }
 });
-
-
-
-
 
 app.post('/finalizar-compra', async (req, res) => {
   const productosEnCarrito = req.body.productos; // [{ id: 101, cantidad: 2 }, ...]
@@ -194,7 +171,6 @@ app.post('/finalizar-compra', async (req, res) => {
   try {
     // 1. Verificar stock para cada variante
     for (const item of productosEnCarrito) {
-      // Buscar el producto que contenga la variante por id
       const producto = await Producto.findOne({ "variantes.id": item.id });
 
       if (!producto) {
@@ -204,7 +180,6 @@ app.post('/finalizar-compra', async (req, res) => {
         });
       }
 
-      // Encontrar la variante dentro del producto
       const variante = producto.variantes.find(v => v.id === item.id);
 
       if (!variante) {
@@ -222,7 +197,7 @@ app.post('/finalizar-compra', async (req, res) => {
       }
     }
 
-    // 2. Descontar stock para cada variante (operación atómica por variante)
+    // 2. Descontar stock para cada variante
     for (const item of productosEnCarrito) {
       const actualizado = await Producto.findOneAndUpdate(
         {
@@ -241,7 +216,6 @@ app.post('/finalizar-compra', async (req, res) => {
       }
     }
 
-    // Si llegamos acá, todo fue bien
     return res.status(200).json({
       ok: true,
       mensaje: 'Compra realizada con éxito.'
