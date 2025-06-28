@@ -140,18 +140,17 @@ app.patch('/productos/variantes/:id', async (req, res) => {
     res.status(500).json({ error: 'Error al actualizar el stock' });
   }
 });
-
-// Eliminar una variante específica por ID
+// DELETE /productos/variantes/:id
 app.delete('/productos/variantes/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await Producto.updateOne(
-      { "variantes.id": Number(id) },
-      { $pull: { variantes: { id: Number(id) } } }
+    const resultado = await Producto.updateOne(
+      { "variantes.id": Number(id) },  // busca la variante por ID
+      { $pull: { variantes: { id: Number(id) } } }  // la elimina del array
     );
 
-    if (result.modifiedCount === 0) {
+    if (resultado.modifiedCount === 0) {
       return res.status(404).json({ error: 'Variante no encontrada o ya eliminada' });
     }
 
@@ -161,6 +160,27 @@ app.delete('/productos/variantes/:id', async (req, res) => {
     res.status(500).json({ error: 'Error interno al eliminar la variante' });
   }
 });
+// DELETE /productos/variantes/:id
+app.delete('/productos/variantes/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const resultado = await Producto.updateOne(
+      { "variantes.id": Number(id) },  // busca la variante por ID
+      { $pull: { variantes: { id: Number(id) } } }  // la elimina del array
+    );
+
+    if (resultado.modifiedCount === 0) {
+      return res.status(404).json({ error: 'Variante no encontrada o ya eliminada' });
+    }
+
+    res.status(200).json({ message: 'Variante eliminada correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar variante:', error);
+    res.status(500).json({ error: 'Error interno al eliminar la variante' });
+  }
+});
+
 
 app.post('/finalizar-compra', async (req, res) => {
   const productosEnCarrito = req.body.productos; // [{ id: 101, cantidad: 2 }, ...]
