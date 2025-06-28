@@ -1,4 +1,4 @@
- const express = require('express');
+const express = require('express');
 const mongoose = require('mongoose');
 require('dotenv').config();
 const cors = require('cors');
@@ -23,7 +23,6 @@ app.use(express.json());
 
 // Servir archivos estáticos de la carpeta uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 
 // Configuración de multer para subir PDFs
 const storage = multer.diskStorage({
@@ -98,8 +97,6 @@ app.get('/productos/variantes', async (req, res) => {
   }
 });
 
-
-
 app.get('/productos/variantes/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -111,9 +108,6 @@ app.get('/productos/variantes/:id', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener el stock de la variante' });
   }
 });
-
-
-
 
 app.patch('/productos/variantes/:id', async (req, res) => {
   try {
@@ -133,46 +127,38 @@ app.patch('/productos/variantes/:id', async (req, res) => {
     res.status(500).json({ error: 'Error al actualizar el stock' });
   }
 });
-// DELETE /productos/variantes/:id
+
+
 app.delete('/productos/variantes/:id', async (req, res) => {
-  const { id } = req.params;
-
   try {
-    const resultado = await Producto.updateOne(
-      { "variantes.id": Number(id) },  // busca la variante por ID
-      { $pull: { variantes: { id: Number(id) } } }  // la elimina del array
-    );
+    const { id } = req.params;
 
-    if (resultado.modifiedCount === 0) {
-      return res.status(404).json({ error: 'Variante no encontrada o ya eliminada' });
+    // Encontrar el producto que contiene la variante
+    const producto = await Producto.findOne({ "variantes.id": Number(id) });
+    if (!producto) {
+      return res.status(404).json({ error: 'Variante no encontrada' });
     }
 
-    res.status(200).json({ message: 'Variante eliminada correctamente' });
-  } catch (error) {
-    console.error('Error al eliminar variante:', error);
-    res.status(500).json({ error: 'Error interno al eliminar la variante' });
-  }
-});
-// DELETE /productos/variantes/:id
-app.delete('/productos/variantes/:id', async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const resultado = await Producto.updateOne(
-      { "variantes.id": Number(id) },  // busca la variante por ID
-      { $pull: { variantes: { id: Number(id) } } }  // la elimina del array
-    );
-
-    if (resultado.modifiedCount === 0) {
-      return res.status(404).json({ error: 'Variante no encontrada o ya eliminada' });
+    // Encontrar la variante para borrar su imagen si aplica
+    const variante = producto.variantes.find(v => v.id === Number(id));
+    if (variante && variante.imagen) {
+      const rutaImagen = path.join(__dirname, 'uploads', path.basename(variante.imagen));
+      fs.unlink(rutaImagen, (err) => {
+        if (err) console.warn('No se pudo eliminar la imagen:', rutaImagen);
+      });
     }
 
-    res.status(200).json({ message: 'Variante eliminada correctamente' });
+    // Eliminar variante del arreglo
+    producto.variantes = producto.variantes.filter(v => v.id !== Number(id));
+    await producto.save();
+
+    res.json({ message: 'Variante eliminada correctamente', producto });
   } catch (error) {
     console.error('Error al eliminar variante:', error);
-    res.status(500).json({ error: 'Error interno al eliminar la variante' });
+    res.status(500).json({ error: 'Error al eliminar la variante' });
   }
 });
+
 
 
 app.post('/finalizar-compra', async (req, res) => {
@@ -249,10 +235,6 @@ app.post('/finalizar-compra', async (req, res) => {
     });
   }
 });
-
-
-
-
 
 // Iniciar servidor
 const PORT = process.env.PORT || 5000;
