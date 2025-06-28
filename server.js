@@ -101,14 +101,24 @@ app.get('/productos/variantes', async (req, res) => {
 app.get('/productos/variantes/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const productos = await Producto.find();
-    const variante = productos.flatMap(producto => producto.variantes).find(v => v.id === Number(id));
+    const producto = await Producto.findOne({ "variantes.id": Number(id) });
+    if (!producto) return res.status(404).json({ error: 'Producto no encontrado' });
+
+    const variante = producto.variantes.find(v => v.id === Number(id));
     if (!variante) return res.status(404).json({ error: 'Variante no encontrada' });
-    res.json({ stock: variante.stock });
+
+    res.json({
+      producto: {
+        nombre: producto.nombre,
+        imagen: producto.imagen,
+      },
+      variante,
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Error al obtener el stock de la variante' });
+    res.status(500).json({ error: 'Error al obtener la variante' });
   }
 });
+
 
 
 
@@ -128,6 +138,27 @@ app.patch('/productos/variantes/:id', async (req, res) => {
     res.json({ message: 'Stock actualizado correctamente', variante });
   } catch (error) {
     res.status(500).json({ error: 'Error al actualizar el stock' });
+  }
+});
+
+// Eliminar una variante específica por ID
+app.delete('/productos/variantes/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await Producto.updateOne(
+      { "variantes.id": Number(id) },
+      { $pull: { variantes: { id: Number(id) } } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ error: 'Variante no encontrada o ya eliminada' });
+    }
+
+    res.status(200).json({ message: 'Variante eliminada correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar variante:', error);
+    res.status(500).json({ error: 'Error interno al eliminar la variante' });
   }
 });
 
@@ -205,6 +236,8 @@ app.post('/finalizar-compra', async (req, res) => {
     });
   }
 });
+
+
 
 
 
