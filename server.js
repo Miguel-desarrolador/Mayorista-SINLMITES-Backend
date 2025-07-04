@@ -6,37 +6,31 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const uploadDir = path.join(__dirname, 'uploads');
+const app = express();
 
-// Crea la carpeta si no existe
+const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
 
-const app = express();  // <-- Aquí declaras app primero
-
-// Habilitar CORS
+// Middleware global
 app.use(cors());
-
-// Middleware para manejar JSON
-app.use(express.json());
-
-// Servir archivos estáticos de la carpeta uploads
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Configuración de multer para subir PDFs
+// Multer configuración
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
+  destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
@@ -46,7 +40,7 @@ const upload = multer({
   }
 });
 
-// Ruta para subir PDF
+// Subida de PDF
 app.post('/upload-pdf', upload.single('pdf'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No se subió ningún archivo' });
@@ -56,12 +50,20 @@ app.post('/upload-pdf', upload.single('pdf'), (req, res) => {
   res.json({ url: fileUrl });
 });
 
-// Conectar a MongoDB Atlas usando la URI del archivo .env
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("Conectado a la base de datos MongoDB"))
-  .catch((err) => console.error("Error al conectar a la base de datos MongoDB", err));
+// Middleware para errores de subida de archivos
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err.message.includes('PDF')) {
+    return res.status(400).json({ error: err.message });
+  }
+  next(err);
+});
 
-// Esquema y modelo de Producto
+// Conexión a MongoDB
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("Conectado a MongoDB"))
+  .catch(err => console.error("Error de conexión:", err));
+
+// Esquema y modelo
 const productoSchema = new mongoose.Schema({
   nombre: { type: String, required: true, unique: true },
   imagen: { type: String, required: true },
@@ -77,7 +79,7 @@ const productoSchema = new mongoose.Schema({
 
 const Producto = mongoose.model('Producto', productoSchema, 'productos');
 
-// Rutas para productos y variantes
+// Rutas
 app.get('/productos', async (req, res) => {
   try {
     const productos = await Producto.find();
@@ -90,7 +92,7 @@ app.get('/productos', async (req, res) => {
 app.get('/productos/variantes', async (req, res) => {
   try {
     const productos = await Producto.find();
-    const variantes = productos.flatMap(producto => producto.variantes);
+    const variantes = productos.flatMap(p => p.variantes);
     res.json(variantes);
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener variantes' });
@@ -101,7 +103,7 @@ app.get('/productos/variantes/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const productos = await Producto.find();
-    const variante = productos.flatMap(producto => producto.variantes).find(v => v.id === Number(id));
+    const variante = productos.flatMap(p => p.variantes).find(v => v.id === Number(id));
     if (!variante) return res.status(404).json({ error: 'Variante no encontrada' });
     res.json({ stock: variante.stock });
   } catch (err) {
@@ -110,37 +112,31 @@ app.get('/productos/variantes/:id', async (req, res) => {
 });
 
 app.patch('/productos/variantes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { stock } = req.body;
   try {
-    const { id } = req.params;
-    const { stock } = req.body;
-
     const variante = await Producto.findOneAndUpdate(
       { "variantes.id": Number(id) },
       { $set: { "variantes.$.stock": stock } },
       { new: true }
     );
-
     if (!variante) return res.status(404).json({ error: 'Variante no encontrada' });
-
     res.json({ message: 'Stock actualizado correctamente', variante });
   } catch (error) {
     res.status(500).json({ error: 'Error al actualizar el stock' });
   }
 });
-// DELETE /productos/variantes/:id
+
 app.delete('/productos/variantes/:id', async (req, res) => {
   const { id } = req.params;
-
   try {
     const resultado = await Producto.updateOne(
-      { "variantes.id": Number(id) },  // busca la variante por ID
-      { $pull: { variantes: { id: Number(id) } } }  // la elimina del array
+      { "variantes.id": Number(id) },
+      { $pull: { variantes: { id: Number(id) } } }
     );
-
     if (resultado.modifiedCount === 0) {
       return res.status(404).json({ error: 'Variante no encontrada o ya eliminada' });
     }
-
     res.status(200).json({ message: 'Variante eliminada correctamente' });
   } catch (error) {
     console.error('Error al eliminar variante:', error);
@@ -148,9 +144,9 @@ app.delete('/productos/variantes/:id', async (req, res) => {
   }
 });
 
-
+// Finalizar compra
 app.post('/finalizar-compra', async (req, res) => {
-  const productosEnCarrito = req.body.productos; // [{ id: 101, cantidad: 2 }, ...]
+  const productosEnCarrito = req.body.productos;
 
   if (!Array.isArray(productosEnCarrito) || productosEnCarrito.length === 0) {
     return res.status(400).json({
@@ -159,25 +155,25 @@ app.post('/finalizar-compra', async (req, res) => {
     });
   }
 
+  for (const item of productosEnCarrito) {
+    if (typeof item.id !== 'number' || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: `Datos inválidos para producto. Asegúrate de que el id sea número y la cantidad mayor a 0.`
+      });
+    }
+  }
+
   try {
-    // 1. Verificar stock para cada variante
     for (const item of productosEnCarrito) {
       const producto = await Producto.findOne({ "variantes.id": item.id });
-
       if (!producto) {
-        return res.status(400).json({
-          ok: false,
-          mensaje: `Producto con variante ID ${item.id} no encontrado.`
-        });
+        return res.status(400).json({ ok: false, mensaje: `Producto con variante ID ${item.id} no encontrado.` });
       }
 
       const variante = producto.variantes.find(v => v.id === item.id);
-
       if (!variante) {
-        return res.status(400).json({
-          ok: false,
-          mensaje: `Variante con ID ${item.id} no encontrada.`
-        });
+        return res.status(400).json({ ok: false, mensaje: `Variante con ID ${item.id} no encontrada.` });
       }
 
       if (variante.stock < item.cantidad) {
@@ -188,7 +184,6 @@ app.post('/finalizar-compra', async (req, res) => {
       }
     }
 
-    // 2. Descontar stock para cada variante
     for (const item of productosEnCarrito) {
       const actualizado = await Producto.findOneAndUpdate(
         {
