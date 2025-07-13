@@ -120,7 +120,12 @@ app.patch('/productos/variantes/:id', async (req, res) => {
       { new: true }
     );
 
-    if (!variante) return res.status(404).json({ error: 'Variante no encontrada' });
+    if (typeof item.id !== 'number' || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
+  return res.status(400).json({
+    ok: false,
+    mensaje: `Datos inválidos para el producto con id ${item.id}`
+  });
+}
 
     res.json({ message: 'Stock actualizado correctamente', variante });
   } catch (error) {
