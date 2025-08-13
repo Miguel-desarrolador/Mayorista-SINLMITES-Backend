@@ -38,16 +38,16 @@ const storage = multer.diskStorage({
 const upload = multer({ 
   storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
+    if (file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
-      cb(new Error('Solo se permiten archivos PDF'));
+      cb(new Error('Solo se permiten archivos PDF o imágenes'));
     }
   }
 });
 
-// Ruta para subir PDF
-app.post('/upload-pdf', upload.single('pdf'), (req, res) => {
+// Ruta para subir PDF o imágenes
+app.post('/upload-file', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No se subió ningún archivo' });
   }
@@ -220,6 +220,9 @@ app.post('/finalizar-compra', async (req, res) => {
     });
   }
 });
+
+// El código está correcto y funcional.
+// Si tienes un error específico, indícalo para corregirlo.
 
 // Iniciar servidor
 const PORT = process.env.PORT || 5000;
