@@ -168,8 +168,8 @@ fs.writeFileSync(filePath, buffer);
     // ======================
     const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
     const linkPublico = `${baseUrl}/uploads/${encodeURIComponent(fileName)}`;
-
-    const numero = "3413047240";
+    
+    const numero = "5493416996971";
     const mensaje = `Hola! Aquí está mi compra en pdf: ${linkPublico}`;
     const urlWhatsApp = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
 
