@@ -70,13 +70,23 @@ router.post("/pdf", async (req, res) => {
 
     const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
-    for (let key in datosCliente) {
-      doc.setFont("helvetica", "bold");
-      doc.text(`${capitalize(key)}:`, margen + 10, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(`${datosCliente[key]}`, margen + 120, y);
-      y += 18;
-    }
+    const etiquetasCliente = {
+  nombre: "Nombre",
+  apellido: "Apellido",
+  telefono: "Teléfono",
+  direccion: "Dirección",
+  email: "Email",
+  dispositivo: "Dispositivo",
+  formaPago: "Forma de Pago"
+};
+
+for (let key in datosCliente) {
+  doc.setFont("helvetica", "bold");
+  doc.text(`${etiquetasCliente[key]}:`, margen + 10, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${datosCliente[key]}`, margen + 120, y);
+  y += 18;
+}
 
     // ======================
     // Encabezado de tabla productos
